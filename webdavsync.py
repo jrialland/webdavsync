@@ -226,7 +226,7 @@ def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False):
     baseurl = baseurl + '/' if baseurl[-1] <> '/' else baseurl
     localdir = os.path.abspath(localdir)
     for filename in rglob(localdir):
-        if filename[0] <> '.':
+        if os.path.basename(filename)[0] <> '.':
             path = filename[1 + len(localdir):].replace(os.sep, '/')
             targeturl = baseurl + path
             if exists(targeturl, credentials) and not upload_if_exists:
