@@ -325,10 +325,10 @@ if __name__ == '__main__':
                               help=" download file even if it already exists locally")
 
     dwngroup.add_option("-E", "--downloadifexisted", dest="downloadifexisted",  action="store_true",
-                              help="download file if it has been downloaded once (if this option is inactive, a file name .download_db will be created in target directory and will keep track of previously downloaded files)")
+                              help="download file even if it has been downloaded once (if this option is inactive, a file name .download_db will be created in target directory and will keep track of previously downloaded files)")
 
     dwngroup.add_option('-m', "--add-md5", dest="addmd5", action="store_true",
-                        help="for each file, add a <file>.md5 that contains the md5 checksum")
+                        help="for each file, generate a <file>.md5 that contains the md5 checksum")
 
     parser.add_option_group(dwngroup)
 
