@@ -1,7 +1,7 @@
 webdavsync
 ==========
 
-synchronizes a local folder with a remote webDAV server
+Synchonizes a local directory with a remote WebDAV folder
 
 Usage :
 -------
