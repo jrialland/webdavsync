@@ -195,27 +195,32 @@ def exists(url, credentials=None):
 
 
 def url_upload_file(filename, url, credentials=None):
-        # try a mkcol
+    
+    # try a mkcol
     dirurl = re.sub('[^/]*$', '', url.geturl())
     mkcol = urllib2.Request(dirurl)
     mkcol.get_method = lambda: 'MKCOL'
     add_basic_auth(mkcol, credentials)
     try:
-        urllib2.openurl(mkcol)
+	logging.debug('MKCOL ' + dirurl)
+        urllib2.urlopen(mkcol)
     except Exception:
         pass
 
+    #put file to temporary destination
     put = urllib2.Request(url.geturl() + '.part', file(filename, 'rb'))
     put.get_method = lambda: 'PUT'
     add_basic_auth(put, credentials)
+    logging.debug('PUT ' + url.geturl())
     urllib2.openurl(put)
 
-    move = urllib2.Request(url.geturl() + '.part', file(filename, 'rb'))
+    # move .part file to target destination
+    move = urllib2.Request(url.geturl() + '.part')
     move.get_method = lambda: 'MOVE'
     move.add_header('Destination', url.path)
+    logging.debug('MOVE ' + url.geturl() + '.part ' + url.path)
     add_basic_auth(move, credentials)
     urllib2.urlopen(move)
-
 
 def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False):
     baseurl = baseurl + '/' if baseurl[-1] <> '/' else baseurl
