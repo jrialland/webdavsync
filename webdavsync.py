@@ -377,7 +377,7 @@ if __name__ == '__main__':
         try:
             task.run()
         except Exception, e:
-            logging.exception('download task failure')
+            logging.exception(options.action + ' FAILED')
             if not options.loop:
                 sys.exit(-2)
 
