@@ -31,12 +31,12 @@ def webdav_glob(baseurl, credentials=None, pattern='*'):
     serverurl = urlparse.urlparse(baseurl)
     serverurl = serverurl.scheme + '://' + serverurl.netloc
 
-    request = urllib2.Request(baseurl)
+    request = urllib2.Request(baseurl, data='<D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>')
     request.get_method = lambda: 'PROPFIND'
     logging.debug('PROPFIND ' + baseurl)
     add_basic_auth(request, credentials)
     request.add_header('Depth', '1')
-
+    request.add_header('Brief', 't')
     xmldata = ''.join([line for line in urllib2.urlopen(request)])
     xmldata = re.sub('<(/?)[^> ]+:', '<\\1', xmldata)  # remove namespaces
     for href in dom.parse(StringIO(xmldata)).getElementsByTagName('href'):
