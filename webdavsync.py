@@ -11,6 +11,7 @@ import os.path
 import shutil
 import re
 import xml.dom.minidom as dom
+import mmap
 from cStringIO import StringIO
 
 
@@ -198,7 +199,7 @@ def makedirs(url, credentials):
             raise Exception(current + ' Does not exist !')
         dirs.insert(0, current)
         current = re.sub('[^/]*/?$', '', current)
-        
+
     for d in dirs:
         mkcol = urllib2.Request(d)
         mkcol.get_method = lambda: 'MKCOL'
@@ -212,13 +213,16 @@ def url_upload_file(filename, url, credentials=None):
 
     # put file to temporary destination
     opener = urllib2.build_opener(urllib2.HTTPHandler)
-    put = urllib2.Request(
-        url.geturl() + '.part', data=file(filename, 'rb').read())
-    put.get_method = lambda: 'PUT'
-    add_basic_auth(put, credentials)
-    put.add_header('Content-Type', 'application/octet-stream')
-    logging.debug('PUT ' + url.geturl() + '.part')
-    opener.open(put)
+    with file(filename, 'rb') as uploadfile:
+        mmapped = mmap.mmap(uploadfile.fileno(), 0, access=mmap.ACCESS_READ)
+        put = urllib2.Request(
+            url.geturl() + '.part', data=mmapped)
+        put.get_method = lambda: 'PUT'
+        add_basic_auth(put, credentials)
+        put.add_header('Content-Type', 'application/octet-stream')
+        logging.debug('PUT ' + url.geturl() + '.part')
+        opener.open(put)
+        mmapped.close()
 
     # move .part file to target destination
     move = urllib2.Request(url.geturl() + '.part')
