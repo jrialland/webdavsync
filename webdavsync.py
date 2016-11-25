@@ -14,11 +14,6 @@ import xml.dom.minidom as dom
 from cStringIO import StringIO
 
 
-def get_root_url(url):
-    url = urlparse.parse(url)
-    rooturl = url.scheme + '://' + url.netloc
-
-
 def add_basic_auth(request, credentials):
     if credentials is not None:
         authheader = base64.encodestring(
@@ -31,7 +26,8 @@ def webdav_glob(baseurl, credentials=None, pattern='*'):
     serverurl = urlparse.urlparse(baseurl)
     serverurl = serverurl.scheme + '://' + serverurl.netloc
 
-    request = urllib2.Request(baseurl, data='<D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>')
+    request = urllib2.Request(
+        baseurl, data='<D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>')
     request.get_method = lambda: 'PROPFIND'
     logging.debug('PROPFIND ' + baseurl)
     add_basic_auth(request, credentials)
@@ -194,33 +190,44 @@ def exists(url, credentials=None):
         return False
 
 
-def url_upload_file(filename, url, credentials=None):
-    
-    # try a mkcol
-    dirurl = re.sub('[^/]*$', '', url.geturl())
-    mkcol = urllib2.Request(dirurl)
-    mkcol.get_method = lambda: 'MKCOL'
-    add_basic_auth(mkcol, credentials)
-    try:
-	logging.debug('MKCOL ' + dirurl)
-        urllib2.urlopen(mkcol)
-    except Exception:
-        pass
+def makedirs(url, credentials):
+    current = re.sub('[^/]*$', '', url.geturl())
+    dirs = []
+    while not exists(current):
+        dirs.insert(0, current)
+        current = re.sub('[^/]*/?$', '', current)
 
-    #put file to temporary destination
-    put = urllib2.Request(url.geturl() + '.part', file(filename, 'rb'))
+    print dirs
+    for d in dirs:
+        mkcol = urllib2.Request(d)
+        mkcol.get_method = lambda: 'MKCOL'
+        add_basic_auth(mkcol, credentials)
+        urllib2.urlopen(mkcol)
+
+
+def url_upload_file(filename, url, credentials=None):
+
+    makedirs(url, credentials)
+
+    # put file to temporary destination
+    opener = urllib2.build_opener(urllib2.HTTPHandler)
+    put = urllib2.Request(
+        url.geturl() + '.part', data=file(filename, 'rb').read())
     put.get_method = lambda: 'PUT'
     add_basic_auth(put, credentials)
-    logging.debug('PUT ' + url.geturl())
-    urllib2.openurl(put)
+    put.add_header('Content-Type', 'application/octet-stream')
+    logging.debug('PUT ' + url.geturl() + '.part')
+    opener.open(put)
 
     # move .part file to target destination
     move = urllib2.Request(url.geturl() + '.part')
     move.get_method = lambda: 'MOVE'
-    move.add_header('Destination', url.path)
+    move.add_header('Destination', url.geturl())
+    move.add_header('Overwrite', 'T')
     logging.debug('MOVE ' + url.geturl() + '.part ' + url.path)
     add_basic_auth(move, credentials)
     urllib2.urlopen(move)
+
 
 def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False):
     baseurl = baseurl + '/' if baseurl[-1] <> '/' else baseurl
@@ -233,7 +240,7 @@ def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False):
                 pass
             else:
                 url_upload_file(
-                    filename, urlparse.parseurl(targeturl), credentials)
+                    filename, urlparse.urlparse(targeturl), credentials)
 
 from abc import ABCMeta, abstractmethod
 
@@ -271,20 +278,19 @@ class WebdavDownloadTask(Task):
 
 class WebdavUploadTask(Task):
 
-    def run(self):
-        def __init__(self, localdir, targeturl, credentials=None, upload_if_exists=False):
-            self.localdir = localdir
-            self.targeturl = targeturl
-            self.credentials = credentials
-            self.upload_if_exists = upload_if_exists
+    def __init__(self, localdir, targeturl, credentials=None, upload_if_exists=False):
+        self.localdir = localdir
+        self.targeturl = targeturl
+        self.credentials = credentials
+        self.upload_if_exists = upload_if_exists
 
-        def run(self):
-            url_upload_dir(
-                self.localdir,
-                self.targeturl,
-                self.credentials,
-                self.upload_if_exists
-            )
+    def run(self):
+        url_upload_dir(
+            self.localdir,
+            self.targeturl,
+            self.credentials,
+            self.upload_if_exists
+        )
 
 __all__ = ['WebdavDownloadTask', 'WebdavUploadTask']
 
@@ -317,7 +323,8 @@ if __name__ == '__main__':
     parser.add_option("-l", "--loop", dest="loop",  action="store_true",
                       help="loop forever")
 
-    parser.add_option("-t", "--interval", dest="interval",  type="int", default=60,
+    parser.add_option(
+        "-t", "--interval", dest="interval",  type="int", default=60,
                       help="interval in seconds between loops (meaningless if the -l option is inactive)")
 
     parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
@@ -326,10 +333,12 @@ if __name__ == '__main__':
     dwngroup = optparse.OptionGroup(
         parser, 'DOWNLOAD Options', 'Options available only in Download mode')
 
-    dwngroup.add_option("-e", "--downloadifexists", dest="downloadifexists", action="store_true",
+    dwngroup.add_option(
+        "-e", "--downloadifexists", dest="downloadifexists", action="store_true",
                               help=" download file even if it already exists locally")
 
-    dwngroup.add_option("-E", "--downloadifexisted", dest="downloadifexisted",  action="store_true",
+    dwngroup.add_option(
+        "-E", "--downloadifexisted", dest="downloadifexisted",  action="store_true",
                               help="download file even if it has been downloaded once (if this option is inactive, a file name .download_db will be created in target directory and will keep track of previously downloaded files)")
 
     dwngroup.add_option('-m', "--add-md5", dest="addmd5", action="store_true",
@@ -340,7 +349,8 @@ if __name__ == '__main__':
     uploadgroup = optparse.OptionGroup(
         parser, 'UPLOAD Options', 'Options available only in Upload mode')
 
-    uploadgroup.add_option("-r", "--uploadifexists", dest="uploadifexists",  action="store_true",
+    uploadgroup.add_option(
+        "-r", "--uploadifexists", dest="uploadifexists",  action="store_true",
                            help="upload file even if a file with the same name exists remotely")
 
     parser.add_option_group(uploadgroup)
@@ -369,7 +379,8 @@ if __name__ == '__main__':
         if not options.username is None:
             creds = (options.username, options.password)
         if options.action == 'DOWNLOAD':
-            task = WebdavDownloadTask(options.url, options.dir, credentials=creds, flatten=options.flatten,
+            task = WebdavDownloadTask(
+                options.url, options.dir, credentials=creds, flatten=options.flatten,
                                       download_if_exists=options.downloadifexists, download_if_existed=options.downloadifexisted, addmd5=options.addmd5)
         else:
             task = WebdavUploadTask(
