@@ -194,10 +194,11 @@ def makedirs(url, credentials):
     current = re.sub('[^/]*$', '', url.geturl())
     dirs = []
     while not exists(current):
+        if urlparse.urlparse(current).path == '':
+            raise Exception(current + ' Does not exist !')
         dirs.insert(0, current)
         current = re.sub('[^/]*/?$', '', current)
-
-    print dirs
+        
     for d in dirs:
         mkcol = urllib2.Request(d)
         mkcol.get_method = lambda: 'MKCOL'
