@@ -242,7 +242,8 @@ def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False):
             path = filename[1 + len(localdir):].replace(os.sep, '/')
             targeturl = baseurl + path
             if upload_if_exists or not exists(targeturl, credentials):
-                url_upload_file(filename, urlparse.urlparse(targeturl), credentials)
+                url_upload_file(
+                    filename, urlparse.urlparse(targeturl), credentials)
 
 from abc import ABCMeta, abstractmethod
 
@@ -319,17 +320,20 @@ if __name__ == '__main__':
     parser.add_option("-P", "--password", dest="password",
                       help="Basic auth Password", metavar="PASSWORD")
 
-    parser.add_option("-f", "--flatten", dest="flatten", action="store_true", default=False,
+    parser.add_option(
+        "-f", "--flatten", dest="flatten", action="store_true", default=False,
                       help="put all files at the same level in target directory")
 
-    parser.add_option("-l", "--loop", dest="loop",  action="store_true", default=False,
+    parser.add_option(
+        "-l", "--loop", dest="loop",  action="store_true", default=False,
                       help="loop forever")
 
     parser.add_option(
         "-t", "--interval", dest="interval",  type="int", default=60,
                       help="interval in seconds between loops (meaningless if the -l option is inactive)")
 
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
+    parser.add_option(
+        "-v", "--verbose", dest="verbose", action="store_true", default=False,
                       help="be verbose about what is being done")
 
     dwngroup = optparse.OptionGroup(
@@ -343,7 +347,8 @@ if __name__ == '__main__':
         "-E", "--downloadifexisted", dest="downloadifexisted",  action="store_true", default=False,
                               help="download file even if it has been downloaded once (if this option is inactive, a file name .download_db will be created in target directory and will keep track of previously downloaded files)")
 
-    dwngroup.add_option('-m', "--add-md5", dest="addmd5", action="store_true", default=False,
+    dwngroup.add_option(
+        '-m', "--add-md5", dest="addmd5", action="store_true", default=False,
                         help="for each file, generate a <file>.md5 that contains the md5 checksum")
 
     parser.add_option_group(dwngroup)
