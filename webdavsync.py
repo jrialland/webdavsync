@@ -388,8 +388,9 @@ if __name__ == '__main__':
                 options.url, options.dir, credentials=creds, flatten=options.flatten,
                                       download_if_exists=options.downloadifexists, download_if_existed=options.downloadifexisted, addmd5=options.addmd5)
         else:
+            uploadifexists = not options.uploadifexists
             task = WebdavUploadTask(
-                localdir=options.dir, targeturl=options.url, credentials=creds, upload_if_exists=options.uploadifexists)
+                localdir=options.dir, targeturl=options.url, credentials=creds, upload_if_exists=uploadifexists)
         try:
             task.run()
         except Exception, e:
