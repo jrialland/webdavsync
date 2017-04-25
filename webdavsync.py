@@ -241,11 +241,8 @@ def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False):
         if os.path.basename(filename)[0] <> '.':
             path = filename[1 + len(localdir):].replace(os.sep, '/')
             targeturl = baseurl + path
-            if exists(targeturl, credentials) and not upload_if_exists:
-                pass
-            else:
-                url_upload_file(
-                    filename, urlparse.urlparse(targeturl), credentials)
+            if upload_if_exists or not exists(targeturl, credentials):
+                url_upload_file(filename, urlparse.urlparse(targeturl), credentials)
 
 from abc import ABCMeta, abstractmethod
 
@@ -322,31 +319,31 @@ if __name__ == '__main__':
     parser.add_option("-P", "--password", dest="password",
                       help="Basic auth Password", metavar="PASSWORD")
 
-    parser.add_option("-f", "--flatten", dest="flatten", action="store_true",
+    parser.add_option("-f", "--flatten", dest="flatten", action="store_true", default=False,
                       help="put all files at the same level in target directory")
 
-    parser.add_option("-l", "--loop", dest="loop",  action="store_true",
+    parser.add_option("-l", "--loop", dest="loop",  action="store_true", default=False,
                       help="loop forever")
 
     parser.add_option(
         "-t", "--interval", dest="interval",  type="int", default=60,
                       help="interval in seconds between loops (meaningless if the -l option is inactive)")
 
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
+    parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
                       help="be verbose about what is being done")
 
     dwngroup = optparse.OptionGroup(
         parser, 'DOWNLOAD Options', 'Options available only in Download mode')
 
     dwngroup.add_option(
-        "-e", "--downloadifexists", dest="downloadifexists", action="store_true",
+        "-e", "--downloadifexists", dest="downloadifexists", action="store_true", default=False,
                               help=" download file even if it already exists locally")
 
     dwngroup.add_option(
-        "-E", "--downloadifexisted", dest="downloadifexisted",  action="store_true",
+        "-E", "--downloadifexisted", dest="downloadifexisted",  action="store_true", default=False,
                               help="download file even if it has been downloaded once (if this option is inactive, a file name .download_db will be created in target directory and will keep track of previously downloaded files)")
 
-    dwngroup.add_option('-m', "--add-md5", dest="addmd5", action="store_true",
+    dwngroup.add_option('-m', "--add-md5", dest="addmd5", action="store_true", default=False,
                         help="for each file, generate a <file>.md5 that contains the md5 checksum")
 
     parser.add_option_group(dwngroup)
@@ -355,12 +352,13 @@ if __name__ == '__main__':
         parser, 'UPLOAD Options', 'Options available only in Upload mode')
 
     uploadgroup.add_option(
-        "-r", "--uploadifexists", dest="uploadifexists",  action="store_true",
+        "-r", "--uploadifexists", dest="uploadifexists",  action="store_true", default=False,
                            help="upload file even if a file with the same name exists remotely")
 
     parser.add_option_group(uploadgroup)
 
     (options, args) = parser.parse_args()
+
     if not options.action in ['UPLOAD', 'DOWNLOAD']:
         sys.stderr.write(
             "the --action parameter must eval to 'UPLOAD' or 'DOWNLOAD'\n")
@@ -370,6 +368,7 @@ if __name__ == '__main__':
         sys.stderr.write(
             'the --url parameter is required (' + sys.argv[0] + ' -h for help)\n')
         sys.exit(-1)
+
     if options.dir is None:
         sys.stderr.write(
             'the --dir parameter is required (' + sys.argv[0] + ' -h for help)\n')
@@ -388,9 +387,8 @@ if __name__ == '__main__':
                 options.url, options.dir, credentials=creds, flatten=options.flatten,
                                       download_if_exists=options.downloadifexists, download_if_existed=options.downloadifexisted, addmd5=options.addmd5)
         else:
-            uploadifexists = not options.uploadifexists
             task = WebdavUploadTask(
-                localdir=options.dir, targeturl=options.url, credentials=creds, upload_if_exists=uploadifexists)
+                localdir=options.dir, targeturl=options.url, credentials=creds, upload_if_exists=options.uploadifexists)
         try:
             task.run()
         except Exception, e:
