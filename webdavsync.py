@@ -120,9 +120,45 @@ class TrackDb:
         self.conn.commit()
         logging.debug('[tracking db] added ' + filename)
 
+    def get_md5_from_db(self, filename):
+        filename = os.path.abspath(filename)
+        filename = filename[len(self.basedir):].replace('\\', '/')   
+        c = self.conn.cursor()
+        c.execute("select md5 from files where path=?", [filename])
+        return c.fetchone()[0] 
+
+    def update_md5(self, filename, md5):
+        filename = os.path.abspath(filename)
+        filename = filename[len(self.basedir):].replace('\\', '/')
+        c = self.conn.cursor()
+        c.execute("update files set md5=?, dl_date=datetime('now') where path=?", [md5, filename])
+        self.conn.commit()
+
     def close(self):
         self.conn.close()
 
+
+trackDbs = {}
+def getDb(localdir):
+    if not localdir in trackDbs:
+        logging.debug('[tracking db] using tracking db ' + os.path.join(localdir, '.download_history'))
+        trackDbs[localdir] = TrackDb(localdir)
+    return trackDbs[localdir]
+
+def is_new_or_modified(localdir, path):
+    trackDb = getDb(localdir)
+    if not trackDb.is_in_db(os.path.join(localdir, path)):
+        #the file is new!
+        logging.debug('New File : ' + os.path.join(localdir, path))
+        return True
+    else:
+        known_md5 = trackDb.get_md5_from_db(os.path.join(localdir, path))
+        md5 = compute_md5(os.path.join(localdir, path))
+        if md5 != known_md5:
+           logging.debug('Modified File : ' + os.path.join(localdir, path))
+           return True
+        else:
+           return False
 
 def url_download_dir(baseurl, credentials=None, targetdir='.', flatten=False, download_if_exists=True, download_if_existed=False, addmd5=False):
     if not os.path.isdir(targetdir):
@@ -234,16 +270,17 @@ def url_upload_file(filename, url, credentials=None):
     urllib2.urlopen(move)
 
 
-def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False):
+def url_upload_dir(localdir, baseurl, credentials=None, upload_if_exists=False, filefilter = lambda filename:True, noupload=False):
     baseurl = baseurl + '/' if baseurl[-1] <> '/' else baseurl
     localdir = os.path.abspath(localdir)
     for filename in rglob(localdir):
         if os.path.basename(filename)[0] <> '.':
             path = filename[1 + len(localdir):].replace(os.sep, '/')
-            targeturl = baseurl + path
-            if upload_if_exists or not exists(targeturl, credentials):
-                url_upload_file(
-                    filename, urlparse.urlparse(targeturl), credentials)
+            if filefilter(path):
+                targeturl = baseurl + path
+                logging.debug(path + ' => ' + targeturl)
+                if (not noupload) and upload_if_exists or not exists(targeturl, credentials):
+                    url_upload_file(filename, urlparse.urlparse(targeturl), credentials)
 
 from abc import ABCMeta, abstractmethod
 
@@ -281,18 +318,22 @@ class WebdavDownloadTask(Task):
 
 class WebdavUploadTask(Task):
 
-    def __init__(self, localdir, targeturl, credentials=None, upload_if_exists=False):
+    def __init__(self, localdir, targeturl, credentials=None, upload_if_exists=False, onlymodified=False, noupload=False):
         self.localdir = localdir
         self.targeturl = targeturl
         self.credentials = credentials
         self.upload_if_exists = upload_if_exists
+        self.onlymodified = onlymodified
+        self.noupload = noupload
 
     def run(self):
         url_upload_dir(
             self.localdir,
             self.targeturl,
             self.credentials,
-            self.upload_if_exists
+            self.upload_if_exists,
+            filefilter = lambda f : is_new_or_modified(self.localdir, f) if self.onlymodified else (lambda f:True),
+            noupload = self.noupload 
         )
 
 __all__ = ['WebdavDownloadTask', 'WebdavUploadTask']
@@ -319,6 +360,9 @@ if __name__ == '__main__':
 
     parser.add_option("-P", "--password", dest="password",
                       help="Basic auth Password", metavar="PASSWORD")
+
+    parser.add_option("-N", "--noupload", dest="noupload", action="store_true", default=False,
+                      help="Dry run, do not upload anything")
 
     parser.add_option(
         "-f", "--flatten", dest="flatten", action="store_true", default=False,
@@ -360,6 +404,10 @@ if __name__ == '__main__':
         "-r", "--uploadifexists", dest="uploadifexists",  action="store_true", default=False,
                            help="upload file even if a file with the same name exists remotely")
 
+    parser.add_option(
+        "-k", "--diff", dest="diff",  action="store_true", default=False,
+                      help="only choose new/modified files")
+
     parser.add_option_group(uploadgroup)
 
     (options, args) = parser.parse_args()
@@ -392,8 +440,13 @@ if __name__ == '__main__':
                 options.url, options.dir, credentials=creds, flatten=options.flatten,
                                       download_if_exists=options.downloadifexists, download_if_existed=options.downloadifexisted, addmd5=options.addmd5)
         else:
+
+            #onlymodified implies upload_if_exists
+            if options.diff:
+                options.upload_if_exists = True
+
             task = WebdavUploadTask(
-                localdir=options.dir, targeturl=options.url, credentials=creds, upload_if_exists=options.uploadifexists)
+                localdir=options.dir, targeturl=options.url, credentials=creds, upload_if_exists=options.uploadifexists, onlymodified=options.diff, noupload=options.noupload)
         try:
             task.run()
         except Exception, e:
